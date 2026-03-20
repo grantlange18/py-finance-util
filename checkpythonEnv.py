@@ -8,7 +8,7 @@ print(sys.executable)
 if sys.version_info < (3, 8):
     raise RuntimeError("Python 3.8 or newer is required")
 
-# alternatively:
+
 import platform
 print("\nplatform information:")
 print(platform.python_version())      # e.g. "3.11.4"import sys
@@ -20,5 +20,4 @@ import pandas
 print("\npandas version:", pandas.__version__)
 
 import yfinance as yf
-
 print("\nyfinance version:", yf.__version__)
