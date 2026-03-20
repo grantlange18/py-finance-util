@@ -16,7 +16,7 @@ INPUT_FILE = "stocks.csv"
 OUTPUT_FILE = "stockchecked.xlsx"
 
 RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")
-
+YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  # light yellow
 
 def parse_money(value: str) -> Optional[float]:
     if value is None:
@@ -34,7 +34,7 @@ def parse_money(value: str) -> Optional[float]:
         return None
 
 
-def fetch_prices_batch(symbols: list[str], max_retries: int = 3, delay: int = 5) -> dict[str, Optional[float]]:
+def fetch_prices_batch(symbols: list[str], max_retries: int = 3, delay: int = 2) -> dict[str, Optional[float]]:
     """
     Fetch latest close prices for all symbols in one yfinance call.
     Returns a dict like {"AAPL": 213.49, "SPY": 589.22, "USO": 81.34}
@@ -93,7 +93,7 @@ def fetch_prices_batch(symbols: list[str], max_retries: int = 3, delay: int = 5)
         except Exception as e:
             last_error = e
             if attempt < max_retries:
-                sleep_seconds = delay * attempt
+                sleep_seconds = delay 
                 print(f"Batch fetch attempt {attempt} failed: {e}")
                 print(f"Retrying in {sleep_seconds} seconds...")
                 time.sleep(sleep_seconds)
@@ -168,16 +168,22 @@ def main() -> None:
         if isinstance(current_price, (int, float)):
             ws.cell(excel_row, 4).number_format = '$#,##0.00'
 
-        # Red row if outside range
         if (
             current_price is not None
             and target_low is not None
             and target_high is not None
-            and (current_price < target_low or current_price > target_high)
-        ):
-            for col in range(1, len(output_header) + 1):
-                ws.cell(excel_row, col).fill = RED_FILL
+            ):
+            fill = None
 
+            if current_price < target_low:
+                fill = RED_FILL
+            elif current_price > target_high:
+                fill = YELLOW_FILL
+
+        if fill:
+            for col in range(1, len(output_header) + 1):
+                ws.cell(excel_row, col).fill = fill
+    
     autosize_columns(ws)
     wb.save(OUTPUT_FILE)
     print(f"Done. Output written to {OUTPUT_FILE}")

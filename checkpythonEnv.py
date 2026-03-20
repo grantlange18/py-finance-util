@@ -16,6 +16,9 @@ print(platform.python_version())      # e.g. "3.11.4"import sys
 print("\npython executable:", sys.executable)      # e.g. /usr/bin/python3
 print("\nsys.path list:", sys.path)               # module search paths
 
+import pandas
+print("\npandas version:", pandas.__version__)
+
 import yfinance as yf
 
 print("\nyfinance version:", yf.__version__)
