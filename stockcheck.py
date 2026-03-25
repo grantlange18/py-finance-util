@@ -11,6 +11,7 @@ from tomlkit import ws
 import yfinance as yf
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
+from openpyxl.styles import Font
 from datetime import datetime, timedelta
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
@@ -161,7 +162,12 @@ def main() -> None:
 
     price_map = fetch_prices_batch(symbols)
 
-    output_header = header[:3] + ["Current Price", "Previous Closing Price"] + header[3:]
+    output_header = header[:3] + [
+    "Current Price",
+    "Previous Closing Price",
+    "Today's Change $",
+    "Today's Change %"
+    ]  + header[3:]
 
     wb = Workbook()
     ws = wb.active
@@ -177,17 +183,40 @@ def main() -> None:
         target_high = parse_money(padded_row[2])
         current_price = price_map.get(symbol)
         previous_closing_price = fetch_closed_price(symbol) if symbol else None
+        change_dollar = None
+        change_percent = None
+
+        if (
+            isinstance(current_price, (int, float))
+            and isinstance(previous_closing_price, (int, float))
+            and previous_closing_price != 0
+        ):
+            change_dollar = current_price - previous_closing_price
+            change_percent = (change_dollar / previous_closing_price) * 100
 
         current_price_output = current_price if current_price is not None else "NO DATA"
         previous_closing_price_output = (
             previous_closing_price if previous_closing_price is not None else "NO DATA"
         )
+        change_dollar_output = change_dollar if change_dollar is not None else "NO DATA"
+        change_percent_output = (
+            change_percent / 100 if change_percent is not None else "NO DATA"
+        )
+
 
         output_row = (
             padded_row[:3]
-            + [current_price_output, previous_closing_price_output]
+            + [
+            current_price_output,
+            previous_closing_price_output,
+            change_dollar_output,
+            change_percent_output,
+            ]
             + padded_row[3:]
-    )
+        )
+
+
+    
         ws.append(output_row) 
 
         excel_row = ws.max_row
@@ -201,7 +230,27 @@ def main() -> None:
         if isinstance(previous_closing_price, (int, float)):
             ws.cell(excel_row, 5).number_format = "$#,##0.00"
 
+        if isinstance(change_dollar, (int, float)):
+            # Round values
+            change_dollar = round(change_dollar, 2)
+            change_percent = round(change_percent, 4) if change_percent is not None else None
 
+            # Write rounded values back to cells
+            ws.cell(excel_row, 6).value = change_dollar
+            if change_percent is not None:
+                ws.cell(excel_row, 7).value = change_percent / 100  # keep Excel % format
+
+            # Apply number formatting
+            ws.cell(excel_row, 6).number_format = "$#,##0.00"
+            ws.cell(excel_row, 7).number_format = "0.00%"
+
+            # Apply color
+            color = "008000" if change_dollar > 0 else "FF0000"
+            ws.cell(excel_row, 6).font = Font(color=color)
+            ws.cell(excel_row, 7).font = Font(color=color)
+
+        if isinstance(change_percent, (int, float)):
+            ws.cell(excel_row, 7).number_format = "0.00%"
 
         if (
             current_price is not None
