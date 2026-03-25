@@ -7,9 +7,13 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+from tomlkit import ws
 import yfinance as yf
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
+from datetime import datetime, timedelta
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.offsets import CustomBusinessDay
 
 
 INPUT_FILE = "stocks.csv"
@@ -17,6 +21,24 @@ OUTPUT_FILE = "results.xlsx"
 
 RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")
 YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  # light yellow
+
+def get_last_business_date():
+    us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
+    last_business_day = pd.Timestamp.today().normalize() - us_bd
+    return last_business_day.strftime('%Y-%m-%d')
+
+def fetch_closed_price(symbol):
+    last_business_date = get_last_business_date()
+    today = (datetime.now() + timedelta(days=0)).strftime('%Y-%m-%d')
+    data = yf.download(symbol, start=last_business_date, end=today, progress=False)
+
+    if not data.empty:
+        closing_price = data['Close'].iloc[0].item()  # Ensure it's a scalar float
+        #print(f"Closing price for {symbol} on {last_business_date}: ${closing_price:.2f}")
+        return closing_price
+    else:
+        print("No data available for the specified date.")
+        return None
 
 def parse_money(value: str) -> Optional[float]:
     if value is None:
@@ -139,7 +161,7 @@ def main() -> None:
 
     price_map = fetch_prices_batch(symbols)
 
-    output_header = header[:3] + ["Current Price"] + header[3:]
+    output_header = header[:3] + ["Current Price", "Previous Closing Price"] + header[3:]
 
     wb = Workbook()
     ws = wb.active
@@ -154,19 +176,32 @@ def main() -> None:
         target_low = parse_money(padded_row[1])
         target_high = parse_money(padded_row[2])
         current_price = price_map.get(symbol)
+        previous_closing_price = fetch_closed_price(symbol) if symbol else None
 
-        # Put a readable marker if price could not be retrieved
-        current_price_output = current_price if current_price is not None else "RATE LIMITED / NO DATA"
+        current_price_output = current_price if current_price is not None else "NO DATA"
+        previous_closing_price_output = (
+            previous_closing_price if previous_closing_price is not None else "NO DATA"
+        )
 
-        output_row = padded_row[:3] + [current_price_output] + padded_row[3:]
-        ws.append(output_row)
+        output_row = (
+            padded_row[:3]
+            + [current_price_output, previous_closing_price_output]
+            + padded_row[3:]
+    )
+        ws.append(output_row) 
 
         excel_row = ws.max_row
 
-        ws.cell(excel_row, 2).number_format = '$#,##0.00'
-        ws.cell(excel_row, 3).number_format = '$#,##0.00'
+        ws.cell(excel_row, 2).number_format = "$#,##0.00"
+        ws.cell(excel_row, 3).number_format = "$#,##0.00"
+
         if isinstance(current_price, (int, float)):
-            ws.cell(excel_row, 4).number_format = '$#,##0.00'
+            ws.cell(excel_row, 4).number_format = "$#,##0.00"
+
+        if isinstance(previous_closing_price, (int, float)):
+            ws.cell(excel_row, 5).number_format = "$#,##0.00"
+
+
 
         if (
             current_price is not None
