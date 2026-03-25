@@ -13,7 +13,7 @@ from openpyxl.styles import PatternFill
 
 
 INPUT_FILE = "stocks.csv"
-OUTPUT_FILE = "stockchecked.xlsx"
+OUTPUT_FILE = "results.xlsx"
 
 RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")
 YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  # light yellow
