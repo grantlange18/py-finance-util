@@ -10,8 +10,9 @@ import pandas as pd
 from tomlkit import ws
 import yfinance as yf
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.styles import Font
+from openpyxl.styles import Border, Side
 from datetime import datetime, timedelta
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
@@ -20,8 +21,8 @@ from pandas.tseries.offsets import CustomBusinessDay
 INPUT_FILE = "stocks.csv"
 OUTPUT_FILE = "results.xlsx"
 
-RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")
-YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  # light yellow
+RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")     #Current Price < Target Low
+YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  #Current Price > Target High
 
 def get_last_business_date():
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
@@ -173,7 +174,18 @@ def main() -> None:
     ws = wb.active
     ws.title = "Stock Check"
     ws.append(output_header)
+
+    bold_font = Font(bold=True)
+
+    for col in range(1, len(output_header) + 1):
+        ws.cell(row=1, column=col).font = bold_font
+
+
     ws.freeze_panes = "A2"
+    for col in range(1, len(output_header) + 1):
+        ws.cell(row=1, column=col).alignment = Alignment(horizontal="center")
+
+    output_data = []
 
     for row in rows[1:]:
         padded_row = row + [""] * max(0, len(header) - len(row))
@@ -216,10 +228,30 @@ def main() -> None:
         )
 
 
-    
-        ws.append(output_row) 
+
+        output_data.append({
+            "row": output_row,
+            "change_percent": change_percent if isinstance(change_percent, (int, float)) else float("-inf"),
+            "target_low": target_low,
+            "target_high": target_high,
+        })
 
         excel_row = ws.max_row
+ 
+    
+    output_data.sort(key=lambda x: x["change_percent"], reverse=True)
+
+    for item in output_data:
+        ws.append(item["row"])
+        excel_row = ws.max_row
+
+        current_price = item["row"][3]
+        previous_closing_price = item["row"][4]
+        change_dollar = item["row"][5]
+        change_percent = item["row"][6]
+
+        target_low = item["target_low"]
+        target_high = item["target_high"]
 
         ws.cell(excel_row, 2).number_format = "$#,##0.00"
         ws.cell(excel_row, 3).number_format = "$#,##0.00"
@@ -231,34 +263,18 @@ def main() -> None:
             ws.cell(excel_row, 5).number_format = "$#,##0.00"
 
         if isinstance(change_dollar, (int, float)):
-            # Round values
-            change_dollar = round(change_dollar, 2)
-            change_percent = round(change_percent, 4) if change_percent is not None else None
-
-            # Write rounded values back to cells
-            ws.cell(excel_row, 6).value = change_dollar
-            if change_percent is not None:
-                ws.cell(excel_row, 7).value = change_percent / 100  # keep Excel % format
-
-            # Apply number formatting
             ws.cell(excel_row, 6).number_format = "$#,##0.00"
-            ws.cell(excel_row, 7).number_format = "0.00%"
-
-            # Apply color
-            color = "008000" if change_dollar > 0 else "FF0000"
-            ws.cell(excel_row, 6).font = Font(color=color)
-            ws.cell(excel_row, 7).font = Font(color=color)
 
         if isinstance(change_percent, (int, float)):
             ws.cell(excel_row, 7).number_format = "0.00%"
 
+        fill = None
+
         if (
-            current_price is not None
+            isinstance(current_price, (int, float))
             and target_low is not None
             and target_high is not None
-            ):
-            fill = None
-
+        ):
             if current_price < target_low:
                 fill = RED_FILL
             elif current_price > target_high:
@@ -267,8 +283,21 @@ def main() -> None:
         if fill:
             for col in range(1, len(output_header) + 1):
                 ws.cell(excel_row, col).fill = fill
-    
+
     autosize_columns(ws)
+
+    # add borders here
+    from openpyxl.styles import Border, Side
+
+    thin = Side(style="thin")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row,
+                            min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = border
+
+
     wb.save(OUTPUT_FILE)
     print(f"Done. Output written to {OUTPUT_FILE}")
 
