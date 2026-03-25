@@ -24,6 +24,16 @@ OUTPUT_FILE = "results.xlsx"
 RED_FILL = PatternFill(fill_type="solid", fgColor="FFC7CE")     #Current Price < Target Low
 YELLOW_FILL = PatternFill(fill_type="solid", fgColor="FFFACD")  #Current Price > Target High
 
+def timed(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.2f}s")
+        return result
+    return wrapper
+
+
 def get_last_business_date():
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
     last_business_day = pd.Timestamp.today().normalize() - us_bd
@@ -135,7 +145,7 @@ def autosize_columns(ws) -> None:
             max_length = max(max_length, len(value))
         ws.column_dimensions[column_letter].width = min(max_length + 2, 40)
 
-
+@timed
 def main() -> None:
     input_path = Path(INPUT_FILE)
     if not input_path.exists():
