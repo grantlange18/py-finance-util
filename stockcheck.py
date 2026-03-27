@@ -176,8 +176,8 @@ def main() -> None:
     output_header = header[:3] + [
     "Current Price",
     "Previous Closing Price",
-    "Today's Change $",
-    "Today's Change %"
+    "Change $",
+    "Change %"
     ]  + header[3:]
 
     wb = Workbook()
@@ -267,16 +267,34 @@ def main() -> None:
         ws.cell(excel_row, 3).number_format = "$#,##0.00"
 
         if isinstance(current_price, (int, float)):
+            cell = ws.cell(excel_row, 4)
             ws.cell(excel_row, 4).number_format = "$#,##0.00"
+            cell.font = Font(bold=True)
 
         if isinstance(previous_closing_price, (int, float)):
             ws.cell(excel_row, 5).number_format = "$#,##0.00"
 
         if isinstance(change_dollar, (int, float)):
-            ws.cell(excel_row, 6).number_format = "$#,##0.00"
+            # Determine color
+            if change_dollar > 0:
+                color = "008000"  # green
+            elif change_dollar < 0:
+                color = "FF0000"  # red
+            else:
+                color = "000000"  # neutral (black)
+            ws.cell(excel_row, 6).number_format = '+$#,##0.00;-$#,##0.00'
+            ws.cell(excel_row, 6).font = Font(color=color, bold=True)
 
         if isinstance(change_percent, (int, float)):
-            ws.cell(excel_row, 7).number_format = "0.00%"
+            # Determine color
+            if change_dollar > 0:
+                color = "008000"  # green
+            elif change_dollar < 0:
+                color = "FF0000"  # red
+            else:
+                color = "000000"  # neutral (black)
+            ws.cell(excel_row, 7).number_format = '+0.00%;-0.00%'
+            ws.cell(excel_row, 7).font = Font(color=color, bold=True)
 
         fill = None
 
