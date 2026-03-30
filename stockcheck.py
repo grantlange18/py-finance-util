@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import time
+
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,8 @@ from openpyxl.styles import Border, Side
 from datetime import datetime, timedelta
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
+
+from xlsx_to_number import xlsx_to_numbers_preserve_formatting
 
 
 INPUT_FILE = "stocks.csv"
@@ -37,10 +40,13 @@ def timed(func):
 def get_last_business_date():
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
     last_business_day = pd.Timestamp.today().normalize() - us_bd
-    return last_business_day.strftime('%Y-%m-%d')
+    last_business_day =  last_business_day.strftime('%Y-%m-%d')
+    
+    return last_business_day
 
 def fetch_closed_price(symbol):
     last_business_date = get_last_business_date()
+    #print("Last business day is "+last_business_date)
     today = (datetime.now() + timedelta(days=0)).strftime('%Y-%m-%d')
     data = yf.download(symbol, start=last_business_date, end=today, progress=False)
 
@@ -49,7 +55,7 @@ def fetch_closed_price(symbol):
         #print(f"Closing price for {symbol} on {last_business_date}: ${closing_price:.2f}")
         return closing_price
     else:
-        print("No data available for the specified date.")
+        print("No data available for the last business date.")
         return None
 
 def parse_money(value: str) -> Optional[float]:
@@ -328,6 +334,8 @@ def main() -> None:
 
     wb.save(OUTPUT_FILE)
     print(f"Done. Output written to {OUTPUT_FILE}")
+    xlsx_to_numbers_preserve_formatting(OUTPUT_FILE, "output.numbers")
+    print("Converted to Numbers format.")
 
 
 if __name__ == "__main__":
