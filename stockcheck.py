@@ -46,6 +46,27 @@ class MarketDateHelper:
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
 
     @classmethod
+    def get_last_business_date_from(cls, input_date_str):
+        """
+        Given a date string (YYYY-MM-DD), return the last market trading day before it.
+        """
+
+        # Convert input string → Timestamp
+        candidate = pd.to_datetime(input_date_str) - cls.us_bd
+
+        while True:
+            start = candidate.strftime("%Y-%m-%d")
+            end = (candidate + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+            data = yf.download("SPY", start=start, end=end, progress=False)
+
+            if not data.empty:
+                return start
+
+            candidate = candidate - cls.us_bd
+
+
+    @classmethod
     def get_last_business_date(cls, force_refresh=False):
         if cls._last_business_date is not None and not force_refresh:
             return cls._last_business_date
@@ -65,6 +86,8 @@ class MarketDateHelper:
                 return start
             
             candidate = candidate - cls.us_bd
+
+
 
 
 def fetch_closed_price(symbol):
