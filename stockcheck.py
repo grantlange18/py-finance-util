@@ -37,12 +37,41 @@ def timed(func):
     return wrapper
 
 
+import pandas as pd
+import yfinance as yf
+from pandas.tseries.offsets import CustomBusinessDay
+from pandas.tseries.holiday import USFederalHolidayCalendar
+
+import pandas as pd
+import yfinance as yf
+from pandas.tseries.offsets import CustomBusinessDay
+from pandas.tseries.holiday import USFederalHolidayCalendar
+
+import logging
+import pandas as pd
+import yfinance as yf
+from pandas.tseries.offsets import CustomBusinessDay
+from pandas.tseries.holiday import USFederalHolidayCalendar
+
+
 def get_last_business_date():
+    # Silence yfinance "possibly delisted" log messages
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+    yf.config.debug.logging = False
+
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
-    last_business_day = pd.Timestamp.today().normalize() - us_bd
-    last_business_day =  last_business_day.strftime('%Y-%m-%d')
-    
-    return last_business_day
+    candidate = pd.Timestamp.today().normalize() - us_bd
+
+    while True:
+        start = candidate.strftime("%Y-%m-%d")
+        end = (candidate + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+        data = yf.download("SPY", start=start, end=end, progress=False, threads=False)
+
+        if not data.empty:
+            return candidate.strftime("%Y-%m-%d")
+
+        candidate = candidate - us_bd
 
 def fetch_closed_price(symbol):
     last_business_date = get_last_business_date()
