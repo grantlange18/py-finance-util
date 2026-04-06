@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+import logging
 from tomlkit import ws
 import yfinance as yf
 from openpyxl import Workbook
@@ -19,6 +20,9 @@ from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 
 from xlsx_to_number import xlsx_to_numbers_preserve_formatting
+
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+yf.config.debug.logging = False
 
 
 INPUT_FILE = "stocks.csv"
@@ -37,44 +41,35 @@ def timed(func):
     return wrapper
 
 
-import pandas as pd
-import yfinance as yf
-from pandas.tseries.offsets import CustomBusinessDay
-from pandas.tseries.holiday import USFederalHolidayCalendar
-
-import pandas as pd
-import yfinance as yf
-from pandas.tseries.offsets import CustomBusinessDay
-from pandas.tseries.holiday import USFederalHolidayCalendar
-
-import logging
-import pandas as pd
-import yfinance as yf
-from pandas.tseries.offsets import CustomBusinessDay
-from pandas.tseries.holiday import USFederalHolidayCalendar
-
-
-def get_last_business_date():
-    # Silence yfinance "possibly delisted" log messages
-    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
-    yf.config.debug.logging = False
-
+class MarketDateHelper:
+    _last_business_date = None
     us_bd = CustomBusinessDay(calendar=USFederalHolidayCalendar())
-    candidate = pd.Timestamp.today().normalize() - us_bd
 
-    while True:
-        start = candidate.strftime("%Y-%m-%d")
-        end = (candidate + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    @classmethod
+    def get_last_business_date(cls, force_refresh=False):
+        if cls._last_business_date is not None and not force_refresh:
+            return cls._last_business_date
 
-        data = yf.download("SPY", start=start, end=end, progress=False, threads=False)
+        candidate = pd.Timestamp.today().normalize() - cls.us_bd
 
-        if not data.empty:
-            return candidate.strftime("%Y-%m-%d")
+        while True:
+            start = candidate.strftime("%Y-%m-%d")
+            end = (candidate + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
-        candidate = candidate - us_bd
+            
+            data = yf.download("SPY", start=start, end=end, progress=False)
+           
+            if not data.empty:
+                cls._last_business_date = start
+                print(f"Determined last business date: {start}")
+                return start
+            
+            candidate = candidate - cls.us_bd
+
 
 def fetch_closed_price(symbol):
-    last_business_date = get_last_business_date()
+    date_helper = MarketDateHelper()
+    last_business_date = date_helper.get_last_business_date()
     #print("Last business day is "+last_business_date)
     today = (datetime.now() + timedelta(days=0)).strftime('%Y-%m-%d')
     data = yf.download(symbol, start=last_business_date, end=today, progress=False)
